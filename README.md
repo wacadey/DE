@@ -296,18 +296,18 @@ S3
                       │
           ┌───────────┴────────────┐
           ▼                        ▼
-      Kafka / MSK          Kinesis Data Streams
+  [V] Kafka / MSK          [V] Kinesis Data Streams
           │                        │
           └───────────┬────────────┘
                       ▼
                 Spark Streaming
                      또는
-                    Flink
+                 [V] Flink
                       │
               Window / Aggregate
               Filter / Detection
                       │
           ┌───────────┼────────────┐
           ▼           ▼            ▼
-      OpenSearch    S3 Silver   Alert/Event
+  [v]OpenSearch(ELK, EFK)  S3 Silver   Alert/Event
 ```

@@ -283,3 +283,31 @@ S3
                       ▼
               Athena / Redshift
 ```
+
+- Real-time Streamming Pipeline
+- 데이터가 들어오는 동시에 즉시 처리
+- 공장 설비/생산시 이상 탐지(감지), 금융 이상 거래 감지, 게임, 실시간 주문량, ...
+```
+┌─────────────────────────────────────────────────────┐
+│          03. REAL-TIME STREAMING PIPELINE           │
+└─────────────────────────────────────────────────────┘
+
+                 로그제너레이터
+                      │
+          ┌───────────┴────────────┐
+          ▼                        ▼
+      Kafka / MSK          Kinesis Data Streams
+          │                        │
+          └───────────┬────────────┘
+                      ▼
+                Spark Streaming
+                     또는
+                    Flink
+                      │
+              Window / Aggregate
+              Filter / Detection
+                      │
+          ┌───────────┼────────────┐
+          ▼           ▼            ▼
+      OpenSearch    S3 Silver   Alert/Event
+```

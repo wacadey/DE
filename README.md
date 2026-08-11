@@ -217,21 +217,21 @@ S3
 ```
                     DATA INGESTION
 
-                         Source
+                         Source <- 데이터 발생
                            │
         ┌──────────────────┼───────────────────┐────────────┐
         │                  │                   │            │
         ▼                  ▼                   ▼            ▼
- [V]Log / Event      [V]Streaming             CDC          Batch 
+ [V]Log / Event      [V]Streaming             CDC          [V]Batch 
  Ingestion             Ingestion           Ingestion     Ingestion
         │                  │                   │            │
         ▼                  ▼                   ▼            ▼
- CloudWatch        Kafka / Kinesis       DMS / Debezium  CSV/API/DB Export
+ CloudWatch      Kafka/MSK / Kinesis       DMS / Debezium  CSV/API/DB Export
  Firehose
         │                  │                   │            │
         └──────────────────┼───────────────────┘────────────┘
                            ▼
-                       S3 BRONZE
+                       S3 BRONZE <- raw 데이터 저장
 ```
 
 - Log / Event Ingestion Pipeline
@@ -248,10 +248,38 @@ S3
                CloudWatch Logs
                       │
                       ▼
-             Amazon Data Firehose
+             Amazon Data Firehose : 시간 혹은 용량 단위 데이터를 묶어서 전송 -> 딜레이 발생
                       │
                       ▼
                  S3 BRONZE
                       │
                  Raw Data 저장
+```
+
+- Batch processing Ingestion pipeline
+  - 쌓여있는 데이터를 일정 주기로 처리 -> Airflow
+```
+┌─────────────────────────────────────────────────────┐
+│             02. BATCH DATA PIPELINE                 │
+└─────────────────────────────────────────────────────┘
+
+                 S3 BRONZE
+                      │
+                      ▼
+                   Airflow : 스케줄 작성 -> DAG 작성 -> 데이터 전처리
+                      │
+          ┌───────────┼───────────┐
+          ▼           ▼           ▼
+       Pandas(소)  Polars(중)   Spark(대)   <- 데이터 처리 규모에 따라 분류
+    10(3)기가이내    수십기가    수백기가,테라급
+          │           │           │
+          └───────────┼───────────┘
+                      ▼
+                 S3 SILVER
+                      │
+                      ▼
+                  S3 GOLD
+                      │
+                      ▼
+              Athena / Redshift
 ```

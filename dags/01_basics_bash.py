@@ -50,15 +50,15 @@ with DAG(
   # 3. Operator 정의
   t1 = BashOperator(
     task_id       = "date-print", # 영문자, 숫자, 하이프, 마침표, 언더바
-    bash_command  = ""
+    bash_command  = "date"
   ) # task 정의됨
   t2 = BashOperator(
     task_id       = "sleep",
-    bash_command  = ""
+    bash_command  = "sleep 5"
   )
   t3 = BashOperator(
     task_id       = "echo-print",
-    bash_command  = ""
+    bash_command  = "echo Hello, World!"
   )
 
   # 4. 의존성 정의, 구동 순서 정의

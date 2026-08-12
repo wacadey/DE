@@ -58,7 +58,7 @@ with DAG(
   )
   t3 = BashOperator(
     task_id       = "echo-print",
-    bash_command  = "echo Hello, World!"
+    bash_command  = 'echo "hello airflow task"'
   )
 
   # 4. 의존성 정의, 구동 순서 정의

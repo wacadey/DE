@@ -325,32 +325,153 @@ S3
   [v]OpenSearch(ELK, EFK)  S3 Silver   Alert/Event
 ```
 
+# 중간 정리 : 구조 유형(텍스트)
+- Application log
+     - 앱, 웹, IOT(센서), 팩토리(센서), 게임, 금융
+- Business Event 
+     - 행위(로그인, 검색, 스크롤)
+- Database Chanage
+     - 업데이트, 수정, 삭제...
+
+
+# DATA STORAGE
+- 수집한 데이터를 어디에 저장하는가?
+     - 원본을 잃지 않고 저장!!
+     - 수집시, 장애등등 누락 -> 백필 작업(누락분 다시 수집해서 채운다!!)
+- 기간
+     - 일정 기간만 보관 (통상 7일, 조정 가능)
+          - kafka, kinesis
+     - 영구 보관
+          - 데이터 레이크 -> s3 (객체 저장, 버킷단위로 관리, 검색지원)
+- 데이터 저장 형태 변화
+     - csv => json => parquet(분석용, 열단위) 유형
+```
+    Ingestion
+        │
+        ▼
+    S3 BRONZE
+───────────────
+  Raw JSON => *.json, *.json.gz
+  Raw CSV  => *.csv
+  Raw Event
+  Raw Log
+  CDC Data
+----------------- => *.parquet
+```
+- 파일 포멧 형태 및 사용용도 표
+
+| 분류            | 대표 확장자                                    | 주요 용도                   |
+| ------------- | ----------------------------------------- | ----------------------- |
+| **정형 데이터**    | `.csv`, `.tsv`, `.xlsx`                   | 매출, 고객, 주문 등 테이블 데이터    |
+| **반정형 데이터**   | `.json`, `.jsonl`, `.xml`, `.yaml`        | API 응답, 이벤트, 로그         |
+| **분석용 컬럼 포맷** | `.parquet`, `.orc`                        | Athena, Spark, Glue 분석  |
+| **빅데이터 포맷**   | `.avro`                                   | Kafka, Spark, 데이터 파이프라인 |
+| **로그 파일**     | `.log`, `.txt`, `.json`, `.json.gz`       | 웹/API/애플리케이션 로그         |
+| **압축 파일**     | `.gz`, `.zip`, `.tar.gz`, `.bz2`          | 저장 공간/전송량 절감            |
+| **이미지**       | `.jpg`, `.png`, `.webp`, `.gif`, `.svg`   | 상품 이미지, ML 데이터          |
+| **영상**        | `.mp4`, `.mov`, `.avi`, `.mkv`            | CCTV, 콘텐츠, ML 데이터       |
+| **오디오**       | `.mp3`, `.wav`, `.flac`                   | 음성 데이터, AI 학습           |
+| **문서**        | `.pdf`, `.docx`, `.pptx`, `.hwp`          | 문서 보관                   |
+| **DB 백업**     | `.sql`, `.dump`, `.bak`                   | 데이터베이스 백업               |
+| **ML/AI 모델**  | `.pkl`, `.joblib`, `.pt`, `.pth`, `.onnx` | 모델 아티팩트                 |
+| **웹 파일**      | `.html`, `.css`, `.js`                    | 정적 웹사이트                 |
+| **바이너리**      | `.bin`, `.dat` 등                          | 기타 애플리케이션 데이터           |
+
+- 저장 형태 (메달리온 아킥텍처 기준) + 파티션 적용
+```
+S3
+│
+버킷 (계정별, 프로젝트별, 팀별,..기준은 설정)
+│
+├── bronze/ (원시 데이터 형태)
+│   ├── api_logs/
+│   │   └── *.json.gz
+│   ├── clickstream/
+│   │   └── *.json
+│   └── orders/
+│       └── *.csv
+│
+├── silver/ (클리닝, 전처리,.. 1차 가공된 데이터, 열기준)
+│   ├── orders/
+│   │   └── *.parquet
+│   └── customers/
+│       └── *.parquet
+│
+└── gold/ (최종 데이터 형태, 데이터 파이프라인의 종착점에 필요한 데이터 형태)
+    ├── daily_sales/
+    │   └── *.parquet
+    └── customer_summary/
+        └── *.parquet
+```
+
+# DATA PROCESSING
+- 쌓은 데이터를 어떻게 처리할 것인가?
+- 배치/스트리밍 방식
+```
+                    DATA PROCESSING
+
+                       S3 BRONZE
+                           │
+             ┌─────────────┴───────────────┐
+             │                             │
+             ▼                             ▼
+       Batch Processing              Stream Processing
+             │                             │
+             ▼                             ▼
+[V]Airflow/MWAA                   Spark Streaming
+/[V]Step Functions + Lambda            / [V]Flink => 데이터 처리
+             │             
+             ▼
+   Pandas / Polars / Spark => 데이터 처리
+
+     - Airflow 내부에서 DAG를 구성하고, DAG 내에서 Pandas/Polars/pySpark등을 활용하여 TASK 작성 -> 처리
+          - EC2등 서버 구축 -> 평시 비용 발생함 or 인프라 외부(로컬 구성) -> 보안 이슈 발생!!
+          - MWAA
+     - Step Functions 에서 Lambda를 구성하고 Lambda 내부에서 Pandas/Polars/pySpark등을 활용 TASK 작성 -> 처리 
+          - 서버리스, 사용할때만 비용 발생
+```
+
+- 프로세싱 전략(strategy) : ETL, ELT
+     - 적절하게 데이터 파이프라인내에 사용
+     - ETL : 전통적인 사용법
+     - ELT : 새롭게 등장해서 확산중
+```
+  Processing Strategy
+
+┌─────────┴─────────┐
+│                   │
+▼                   ▼
+ETL                 ELT
+
+Extract             Extract
+  ↓                   ↓
+Transform             Load
+  ↓                   ↓
+Load                Transform
+```
 - ETL Pipeline
-- Extact Treasfrom Load, 데이터 엔지니어의 전통적인 유형
-- 메달리온 아킥텍처 구조에서 사용 -> 각 레이어에서 데이터 형태 설명
+     - Extact Treasfrom Load, 데이터 엔지니어의 전통적인 유형
+     - 메달리온 아킥텍처 구조에서 사용 -> 각 레이어에서 데이터 형태 설명
 ```
 ┌─────────────────────────────────────────────────────┐
 │                 04. ETL PIPELINE                    │
 └─────────────────────────────────────────────────────┘
 
-             Source / S3 BRONZE
-                      │
-                  Extract
-                      │
-                      ▼
-              Pandas / Polars
-               Spark / Glue (etl, 데이터베이스, 테이블, 크롤러등 활용)
-                      │
-                  Transform
-                      │
-                      ▼
-                   Load
-                      │
-                      ▼
-                 S3 SILVER
-                      │
-                      ▼
-                  S3 GOLD
+     Source / S3 BRONZE Layer
+               │
+          Extract    <-Pandas / Polars / Spark / Glue (etl, 데이터베이스, 테이블, 크롤러등 활용)
+               │
+               ▼
+          Transform  <- Pandas / Polars / Spark / Glue (etl, 데이터베이스, 테이블, 크롤러등 활용)
+               │
+               ▼
+          Load       <- Pandas / Polars / Spark / Glue (etl, 데이터베이스, 테이블, 크롤러등 활용)
+               │
+               ▼
+          S3 SILVER Layer
+               │
+               ▼
+          S3 GOLD
 ```  
 
 
@@ -379,4 +500,167 @@ S3
                       │
                       ▼
              Analytics Mart
+```
+
+
+# DATA MODELING / 아킥텍처
+- 데이터를 어떻게 계층화 관리 
+- 메달리온 아킥텍처 하나의 대안으로 제시 -> 적용/적용 x
+- DATA PROCESSING의 결과를 관리하는 아킥텍처
+```
+  MEDALLION ARCHITECTURE
+
+
+  ┌───────────────┐
+  │    BRONZE     │
+  │   Raw Data    │
+  └───────┬───────┘
+          │
+      Processing -> 데이터 정제, 전처리, 파생변수 등등 
+          │
+          ▼
+  ┌───────────────┐
+  │    SILVER     │
+  │ Clean / Valid │
+  └───────┬───────┘
+          │
+    Business Logic -> 데이터의 최종 목표에 따라 가공
+          │
+          ▼
+  ┌───────────────┐
+  │     GOLD      │
+  │ Analytics     │ -> 최종 데이터 형태
+  └───────────────┘
+```
+
+# DATA SERVING
+- 최종 데이터(골드 레이어)를 어떻게 제공/사용
+```
+            DATA SERVING
+
+                S3 GOLD
+                  │
+  ┌───────────────┼────────────────┐
+  ▼               ▼                ▼
+Athena(서버리스) Redshift     OpenSearch(엘라스틱서치(검색엔진의 오픈소스버전))
+  │               │                │
+  ▼               ▼                ▼
+SQL(질의)  Data Mart(분석)    Search(검색)
+  │               │                │
+  └───────────────┼────────────────┘
+                  ▼
+              QuickSight -> AI 연결 -> RAG -> 서비스
+              Dashboard -> 관제, 모니터링,...
+              Application -> 앱/웹,...
+```
+
+
+# Orchestration
+- 전체 파이프라인 컨트롤(통제)
+- Pipeline Control plane : Airflow/MWAA or Step Functions -> 스케줄링, 반복, 전반위 컨트롤
+- 메달리온 아킥텍처 관점 적용
+```
+                  ORCHESTRATION
+
+                       Airflow
+                          │
+      ┌───────────────────┼───────────────────┐
+      ▼                   ▼                   ▼
+  Ingestion             ETL Job          Data Quality
+      │                   │                   │
+      ▼                   ▼                   ▼
+  S3 Bronze            Silver              Gold
+```
+
+# Observability
+- 전체 공정상에 필요한곳에 적용 -> 모니터링 수행
+```
+                    OBSERVABILITY
+
+Data Generator
+     │
+Ingestion
+     │
+Processing
+     │
+Storage
+     │
+Serving
+     │
+     └──────────────→ Monitoring
+
+CloudWatch
+Prometheus
+Grafana
+OpenSearch Dashboards / 키바나의 aws 버전
+Airflow UI
+```
+
+# 최종 카테고리
+- 키워드만 정리
+```
+DATA ENGINEERING
+
+1. Data Generation
+   └─ 로그제너레이터, faker, ecr + fargate
+
+
+2. Data Ingestion
+   ├─ Log / Event Ingestion
+   │    CloudWatch → Firehose
+   │
+   ├─ Streaming Ingestion
+   │    Kafka / Kinesis
+   │
+   ├─ Batch Ingestion
+   │    File / API / DB Export / Airflow
+   │
+   └─ CDC Ingestion
+        DMS / Debezium
+   
+   └─ E`L`K/E`F`K
+
+
+3. Data Storage
+   ├─ S3
+   ├─ Data Lake
+   └─ Bronze
+
+
+4. Data Processing
+   ├─ Batch Processing
+   │    Airflow + Pandas/Polars/Spark
+   │
+   ├─ Stream Processing
+   │    Flink / Spark Streaming
+   │
+   ├─ ETL
+   └─ ELT
+
+
+5. Data Modeling
+   └─ Medallion
+        Bronze
+          ↓
+        Silver
+          ↓
+         Gold
+
+
+6. Data Serving
+   ├─ Athena
+   ├─ Redshift
+   ├─ OpenSearch/`E`LK/`E`FK
+   └─ QuickSight
+
+
+7. Orchestration
+   └─ Airflow / Step Functions
+
+
+8. Observability
+   ├─ CloudWatch
+   ├─ Prometheus
+   ├─ Grafana
+   └─ OpenSearch Dashboard
 ```

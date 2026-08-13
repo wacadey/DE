@@ -216,3 +216,5 @@ logs/
 airflow/
 
 .vscode/
+
+/dags/data/

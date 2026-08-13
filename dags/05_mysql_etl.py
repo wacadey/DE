@@ -97,9 +97,33 @@ def _load(**kwargs):
   hooks = MySqlHook(mysql_conn_id="mysql_default")
   try:
     with hooks.get_conn() as conn:
-      pass
+      logging.info(f'커넥션 획득 완료')
+      # 1. 커서 획득
+      with conn.cursor() as cursor:
+        # 2. insert 구문 작성
+        sql = '''
+            insert into sensor_readings
+            (sensor_id, timestamp, temperature_c, temperature_f)
+            values
+            (%s,%s,%s,%s)
+        '''
+        # 3. param 구성 (여러 데이터 세팅)
+        params = [
+          ( data["sensor_id"], data["timestamp"], data["temperature"], data["temperature_f"] )
+          for _, data in df.iterrows() # 데이터가 없을때까지 반복, 1세트씩 (인덱스, 데이터) 반환
+        ]
+        # 4. 쿼리 실행
+        cursor.executemany( sql, params ) # n개 데이터 한번에 넣기
+        # 5. 커밋
+        conn.commit()
+        pass
   except Exception as e:
     logging.error(f'sql  에러 { e }')
+  else:
+    logging.info(f'데이터베이스 처리 정상')
+  finally:
+    logging.info(f'데이터베이스 작업 완료')
+    pass
   pass
 
 # DAG 정의

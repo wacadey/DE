@@ -74,10 +74,32 @@ def _transform(**kwargs):
   #      °F = (°C × 9/5) + 32
   target_df["temperature_f"] = (target_df['temperature'] * 9/5) + 32
 
-  pass
+  logging.info( f'가공된 데이터 (rows, cols) {target_df.shape}'  )
+  # 3. 전처리된 내용 [v]csv|parquet|... 저장
+  csv_file_path = f"{DATA_PATH}/preprocessing_data_{kwargs['ds_nodash']}.csv"
+  target_df.to_csv(csv_file_path, index=False)
+  logging.info( f'가공된 데이터 저장 {csv_file_path}'  )
+
+  # 4. 반환, XCOM 전달, 개시
+  return csv_file_path
 
 
 def _load(**kwargs):
+  # 1. csv 경로 획득
+  ti             = kwargs["ti"]
+  csv_file_path  = ti.xcom_pull(task_ids="transform")
+  logging.info( f'전달한 데이터 파일 경로 {csv_file_path}'  )
+  
+  # 2. csv -> df 로드
+  df = pd.read_csv( csv_file_path )
+
+  # 3. mysql 연결 -> 데이터 삽입
+  hooks = MySqlHook(mysql_conn_id="mysql_default")
+  try:
+    with hooks.get_conn() as conn:
+      pass
+  except Exception as e:
+    logging.error(f'sql  에러 { e }')
   pass
 
 # DAG 정의

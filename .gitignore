@@ -214,3 +214,5 @@ logs/
 
 # 로컬(호스트) PC 가상환경
 airflow/
+
+.vscode/

@@ -118,9 +118,50 @@ def _extract_user_data(**kwargs):
     return df.to_dict(orient="records")    
 
 def _api_service_call(**kwargs):
-  pass
+  '''
+    - XCOM에서 데이터 획득 -> api 호출 (post 방식) -> 결과 획득 -> json 역직렬화 -> XCOM 개시
+  '''
+  # XCOM에서 데이터 획득
+  target_user_data = kwargs['ti'].xcom_pull( task_ids='task_extract_data')
+  logging.info(f'신용 평가 대상 고객수 { target_user_data }')
+ 
+  try:
+    # api 호출 (post 방식)
+    res = requests.post( API_URL, json=target_user_data) # JSON 문자열 형태로 데이터 전달
+    # 결과 획득 (분기 -> 성공, 실패(raise)), 200 번 체크등 생략, json 역직렬화
+    results = res.json() # 역직렬화 (문자열 => [ dict, dict, ..])
+    logging.info(f'평가 결과 { results }')
+    # XCOM 개시
+    return results
+  except Exception as e:
+    logging.error(f"통신 오류 {e}")
+    raise
 
 def _load_user_credit(**kwargs):
+  # 1. 결과값 획득
+  target_user_data = kwargs['ti'].xcom_pull( task_ids='task_api_service_data')
+  if not target_user_data:
+    logging.error("신용 평가 결과 없음")
+    raise ValueError("신용 평가 결과 없음")
+
+  # 2. 고객 정보 업데이트
+  hooks = MySqlHook(mysql_conn_id="mysql_default")
+  with hooks.get_conn() as conn:
+    with conn.cursor() as cursor:
+      # 업데이트 쿼리
+      sql = '''
+        update customers
+        set credit_score=%s, grade=%s
+        where user_id=%s
+      '''
+      params = [
+        ( data["credit_score"], data["grade"], data["user_id"])
+        for data in target_user_data # 하나씩 고객데이터 획득하여 처리 -> XCOM 전달된 데이터는 타입 유지
+      ]
+      # 업데이트 수행
+      cursor.executemany( sql, params )
+      conn.commit()
+
   pass
 
 # 2. DAG

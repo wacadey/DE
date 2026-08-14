@@ -36,7 +36,7 @@ resource "aws_s3_bucket" "airflow_data" {
 # S3 Object Ownership(객체 소유권)
 # -------------------------------------------
 resource "aws_s3_bucket_ownership_controls" "airflow_data" {
-  bucket = local.airflow_bucket_name
+  bucket = aws_s3_bucket.airflow_data.id
 
   rule {
     # BucketOwnerEnforced
@@ -55,7 +55,7 @@ resource "aws_s3_bucket_ownership_controls" "airflow_data" {
 # -------------------------------------------
 resource "aws_s3_bucket_public_access_block" "airflow_data" {
   # 대상
-  bucket = local.airflow_bucket_name
+  bucket = aws_s3_bucket.airflow_data.id
 
   # 설정
   # 새로운 public acl 설정 차단
@@ -74,7 +74,7 @@ resource "aws_s3_bucket_public_access_block" "airflow_data" {
 # s3에 저장되는 object를 자동 암호화하도록 설정
 # -------------------------------------------
 resource "aws_s3_bucket_server_side_encryption_configuration" "airflow_data" {
-  bucket = local.airflow_bucket_name
+  bucket = aws_s3_bucket.airflow_data.id
 
   rule {
     apply_server_side_encryption_by_default {
